@@ -1,0 +1,49 @@
+pipeline {
+    agent none
+    stages {
+        stage('Git clone') {
+            agent any
+            steps {
+                git 'https://github.com/shazforiot/HelloWorld-Springboot-App.git'
+            }
+        }
+        stage('compile') {
+            agent any
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('test') {
+            agent any
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('package') {
+            agent any
+            steps {
+                sh 'mvn package'
+            }
+        }
+        stage('deploy') {
+            agent any
+            steps {
+                sh '''
+                rm -rf dockerimg
+                mkdir dockerimg
+                cd dockerimg
+                cp /var/lib/jenkins/workspace/ContinuousDeploymentJob/target/helloworld-0.0.1.war .
+                touch Dockerfile
+                cat <<EOT >> Dockerfile
+                FROM tomcat
+                ADD helloworld.war /usr/local/tomcat/webapps/
+                CMD ["catalina.sh", "run"]
+                EXPOSE 8080
+                EOT
+                sudo docker build -t webimage:$BUILD_NUMBER .
+                sudo docker container run -itd --name webserver$BUILD_NUMBER -p 8080:8080 webimage:$BUILD_NUMBER
+                '''
+            }
+        }
+    }
+}
